@@ -8,6 +8,14 @@ from typing import Pattern
 import numpy as np
 from colorama import Back
 
+from enum import Enum
+
+
+class Letter_Score(Enum):
+    VALID_PLACE = 2
+    VALID_LETTER = 1
+    INVALID_LETTER = -1
+
 
 class Game:
     def __init__(self, word_length: int = 5) -> None:
@@ -20,18 +28,21 @@ class Game:
             dtype=object,
         )
         self.current_guess = ""
+        # Get words from list
         with open(self.WORD_FILE, "r") as f:
             all_words = [word.strip() for word in f.readlines()]
+            # Valid words are words of length 5, and all letters are ascii letters
             self.VALID_WORDS = np.array(
                 [
-                    word
+                    word.lower()
                     for word in all_words
                     if len(word) == self.WORD_LEN
                     and all(c in string.ascii_letters for c in word)
                 ]
             )
             self.remaining_words = self.VALID_WORDS
-            self.word = np.random.choice(self.VALID_WORDS).lower()
+            # Select a random word from list
+            self.word = np.random.choice(self.VALID_WORDS)
 
     def get_new_word(self) -> None:
         # Reset word list
@@ -53,14 +64,14 @@ class Game:
         self.current_guess = w
 
     def generate_regex(self) -> re.Pattern:
-        re_str = ['.' for _ in range(self.WORD_LEN)]
-        for idx,pos_arr in enumerate(self.guessed_matrix.T):
-            #If any letters have score=2, set the corresponding
-            # regex value to that letter
-            if any(pos_arr==2):
-                re_str[idx]=chr( ord('a') + pos_arr.argmax())
-            if any(pos_arr==-1):
-                #re_str[idx]
+        # Original regex is ".....", matching all 5 letter words
+        re_str = ["." for _ in range(self.WORD_LEN)]
+        for idx, pos_arr in enumerate(self.guessed_matrix.T):
+            # Score of 2 means that letter is confirmed in that place
+            if any(pos_arr == Letter_Score.VALID_PLACE):
+                re_str[idx] = chr(ord("a") + pos_arr.argmax())
+            if any(pos_arr == Letter_Score.INVALID_LETTER):
+                # re_str[idx]
                 pass
         return re.compile("".join(re_str))
 
@@ -76,13 +87,19 @@ class Game:
             range(self.WORD_LEN), self.current_guess, self.word
         ):
             if guess_letter == word_letter:
-                self.guessed_matrix[ord(guess_letter) - ord("a")][idx] = 2
+                self.guessed_matrix[ord(guess_letter) - ord("a")][
+                    idx
+                ] = Letter_Score.VALID_PLACE
                 ret_arr[idx] = 2
             elif guess_letter in str(self.word):
-                self.guessed_matrix[ord(guess_letter) - ord("a")][idx] = 1
+                self.guessed_matrix[ord(guess_letter) - ord("a")][
+                    idx
+                ] = Letter_Score.VALID_LETTER
                 ret_arr[idx] = 1
             else:
-                self.guessed_matrix[ord(guess_letter) - ord("a")][idx] = -1
+                self.guessed_matrix[ord(guess_letter) - ord("a")][
+                    idx
+                ] = Letter_Score.INVALID_LETTER
                 ret_arr[idx] = 0
 
         return ret_arr
@@ -108,7 +125,7 @@ class Game:
             self.get_guess("Enter guess here: ")
             guess_arr = self.check_guess()
             self.print_guess()
-            if sum(guess_arr) == 2*self.WORD_LEN:
+            if sum(guess_arr) == 2 * self.WORD_LEN:
                 print("Success")
                 break
         print("Game Over")
