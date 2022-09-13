@@ -1,16 +1,11 @@
-from nis import match
-import string
 import os
 import re
+import string
 import sys
-from typing import Pattern
-from black import main
-
+from enum import Enum
 
 import numpy as np
 from colorama import Back
-
-from enum import Enum
 
 from letter import Letter
 
