@@ -35,6 +35,10 @@ class Game:
             dtype=object,
         )
         self.current_guess = ""
+
+        # Original regex is ".....", matching all 5 letter words
+        self.re_set = [Letter() for _ in range(self.WORD_LEN)]
+
         # Get words from list
         with open(self.WORD_FILE, "r") as f:
             all_words = [word.strip() for word in f.readlines()]
@@ -56,6 +60,8 @@ class Game:
         self.remaining_words = self.VALID_WORDS
         # Reset word to guess
         self.word = np.random.choice(self.VALID_WORDS).lower()
+        #Reset regex
+        self.re_set = [Letter() for _ in range(self.WORD_LEN)]
 
     def get_guess(self, prompt="Enter word: ") -> None:
         while True:
@@ -71,8 +77,7 @@ class Game:
         self.current_guess = w
 
     def generate_regex(self) -> re.Pattern:
-        # Original regex is ".....", matching all 5 letter words
-        re_set = [Letter() for _ in range(self.WORD_LEN)]
+        
         #iterate through each element of word with a length 26 array
         #Guess checker sets letter indexes to their various scores. 
         #letter_idx is current position in word (0-4)
@@ -83,19 +88,19 @@ class Game:
             # to the determined letter
             green_idx = np.where(letter_scores==Letter_Score.GREEN)[0]
             if green_idx.size:
-                re_set[letter_idx].set_letter(self.letter_from_index(green_idx[0]))
+                self.re_set[letter_idx].set_letter(self.letter_from_index(green_idx[0]))
            
             #If letter is gray, remove that letter from ALL undetermined squares
             gray_idx = np.where(letter_scores==Letter_Score.GRAY)[0]
             if gray_idx.size:
-                for letter in re_set:
+                for letter in self.re_set:
                     letter.remove_potentials(self.letter_from_index(gray_idx[0]))
 
             #If letter is yellow, remove that letter from THAT square
             yellow_idx = np.where(letter_scores==Letter_Score.YELLOW)[0]
             if yellow_idx.size:
-                re_set[letter_idx].remove_potentials(self.letter_from_index(yellow_idx[0]))
-        return re.compile("".join([str(letter) for letter in re_set]))
+                self.re_set[letter_idx].remove_potentials(self.letter_from_index(yellow_idx[0]))
+        return re.compile("".join([str(letter) for letter in self.re_set]))
     
     def letter_from_index(self, idx:int) -> str:
         return chr(ord('a') + idx)
