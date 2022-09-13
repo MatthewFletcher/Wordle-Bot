@@ -62,7 +62,7 @@ class Game:
             try:
                 w = input(prompt).lower()
             except EOFError as e:
-                if input("Are you sure you want to end?"):
+                if input("Are you sure you want to end? [y/n]").lower() not in ('y'):
                     sys.exit()
             if w in self.VALID_WORDS:
                 break
@@ -92,7 +92,7 @@ class Game:
                     letter.remove_potentials(self.letter_from_index(gray_idx[0]))
 
             #If letter is yellow, remove that letter from THAT square
-            yellow_idx = np.where(letter_scores==Letter_Score.GRAY)[0]
+            yellow_idx = np.where(letter_scores==Letter_Score.YELLOW)[0]
             if yellow_idx.size:
                 re_set[letter_idx].remove_potentials(self.letter_from_index(yellow_idx[0]))
         return re.compile("".join([str(letter) for letter in re_set]))
