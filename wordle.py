@@ -1,8 +1,10 @@
+from nis import match
 import string
 import os
 import re
 import sys
 from typing import Pattern
+from black import main
 
 
 import numpy as np
@@ -10,21 +12,26 @@ from colorama import Back
 
 from enum import Enum
 
+from letter import Letter
+
 
 class Letter_Score(Enum):
-    VALID_PLACE = 2
-    VALID_LETTER = 1
-    INVALID_LETTER = -1
+    GREEN = 2
+    YELLOW = 1
+    GRAY = -1
 
 
 class Game:
     def __init__(self, word_length: int = 5) -> None:
         self.STAT_FILE = f"/tmp/stats{os.getpid()}.json"
-        self.WORD_FILE = "/Users/fletch-mac/Desktop/wordle_list.txt"
+        self.WORD_FILE = "data/wordle_list.txt"
         self.WORD_LEN = word_length
         self.MAX_GUESS_NUM = 6
+        #Matrix of 6 (guesses) x 26 (letters) 
+        #Contains status codes of each guess
+        #This matrix as written should be capable of holding all data from each game
         self.guessed_matrix = np.array(
-            [(np.zeros(5, dtype=int)) for _ in list(string.ascii_lowercase)],
+            [(np.zeros(self.MAX_GUESS_NUM, dtype=int)) for _ in list(string.ascii_lowercase)],
             dtype=object,
         )
         self.current_guess = ""
@@ -65,20 +72,38 @@ class Game:
 
     def generate_regex(self) -> re.Pattern:
         # Original regex is ".....", matching all 5 letter words
-        re_str = ["." for _ in range(self.WORD_LEN)]
-        for idx, pos_arr in enumerate(self.guessed_matrix.T):
-            # Score of 2 means that letter is confirmed in that place
-            if any(pos_arr == Letter_Score.VALID_PLACE):
-                re_str[idx] = chr(ord("a") + pos_arr.argmax())
-            if any(pos_arr == Letter_Score.INVALID_LETTER):
-                # re_str[idx]
-                pass
-        return re.compile("".join(re_str))
+        re_set = [Letter() for _ in range(self.WORD_LEN)]
+        #iterate through each element of word with a length 26 array
+        #Guess checker sets letter indexes to their various scores. 
+        #letter_idx is current position in word (0-4)
+        #letter_scores is result of each letter using Letter_Score values
+        for letter_idx, letter_scores in enumerate(self.guessed_matrix.T):
+            
+            #If letter was guessed correctly (green), set that letter in the regex
+            # to the determined letter
+            green_idx = np.where(letter_scores==Letter_Score.GREEN)[0]
+            if green_idx.size:
+                re_set[letter_idx].set_letter(self.letter_from_index(green_idx[0]))
+           
+            #If letter is gray, remove that letter from ALL undetermined squares
+            gray_idx = np.where(letter_scores==Letter_Score.GRAY)[0]
+            if gray_idx.size:
+                for letter in re_set:
+                    letter.remove_potentials(self.letter_from_index(gray_idx[0]))
+
+            #If letter is yellow, remove that letter from THAT square
+            yellow_idx = np.where(letter_scores==Letter_Score.GRAY)[0]
+            if yellow_idx.size:
+                re_set[letter_idx].remove_potentials(self.letter_from_index(yellow_idx[0]))
+        return re.compile("".join([str(letter) for letter in re_set]))
+    
+    def letter_from_index(self, idx:int) -> str:
+        return chr(ord('a') + idx)
 
     def get_possible_words(self) -> list:
-        r = self.generate_regex()
+        regex = self.generate_regex()
         # Create list of words that are still valid options
-        ret_arr = [word for word in self.VALID_WORDS if r.match(word)]
+        ret_arr = [word for word in self.VALID_WORDS if regex.match(word)]
         return ret_arr
 
     def check_guess(self) -> np.ndarray:
@@ -89,17 +114,17 @@ class Game:
             if guess_letter == word_letter:
                 self.guessed_matrix[ord(guess_letter) - ord("a")][
                     idx
-                ] = Letter_Score.VALID_PLACE
+                ] = Letter_Score.GREEN
                 ret_arr[idx] = 2
             elif guess_letter in str(self.word):
                 self.guessed_matrix[ord(guess_letter) - ord("a")][
                     idx
-                ] = Letter_Score.VALID_LETTER
+                ] = Letter_Score.YELLOW
                 ret_arr[idx] = 1
             else:
                 self.guessed_matrix[ord(guess_letter) - ord("a")][
                     idx
-                ] = Letter_Score.INVALID_LETTER
+                ] = Letter_Score.GRAY
                 ret_arr[idx] = 0
 
         return ret_arr
@@ -124,12 +149,14 @@ class Game:
             print(f"On guess {i}")
             self.get_guess("Enter guess here: ")
             guess_arr = self.check_guess()
+            print(self.generate_regex())
+            print(self.get_possible_words())
             self.print_guess()
             if sum(guess_arr) == 2 * self.WORD_LEN:
                 print("Success")
                 break
         print("Game Over")
 
-
-g = Game()
-g.play_person_game()
+if __name__ == "__main__":
+    g = Game()
+    g.play_person_game()
